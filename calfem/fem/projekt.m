@@ -61,7 +61,6 @@ for elnr= 1:nelm
     
 end
 
-%%
 a = solveq(Kt,f);
 ed=extract(edof,a);
 patch(ex', ey', ed');
@@ -73,7 +72,7 @@ a_prev=a0;
 f_next=f;
 
 
-for i=1:20
+for i=1:5
 a_next= (C+deltat.*Kt)\(C*a_prev+deltat.*f_next);
 a_prev=a_next;
 end
@@ -91,22 +90,22 @@ caxis([290 300]);
 
 %% Del 3
 
-ndof= nelm +1;
-Kt=zeros(nnod*2);
-f=zeros(nnod*2,1);
+Kt2=zeros(nnod*2);
+f2=zeros(nnod*2,1);
 kpmma=2.8;
 kglas=0.8;
 q=0;
-alfa=100;
 T0= 20+273;
 Q=3*10^6;
 nen=3;
 ep=[1 0.5*0.01];
 C=zeros(nnod);
-Eglas=2.8*10^9;
-Nyglas=0.35;
+EPmma=2.8*10^9;
+NyPmma=0.35;
 Elins=67*10^9;
 Nylins=0.2;
+alphaPMMA=70*10^-6;
+alphaGlass=7*10^-6;
 
 
 [ex, ey]=coordxtr(edof, coord, dof, nen);
@@ -115,55 +114,84 @@ for elnr= 1:nelm
     deltaT=sum(ed(elnr,:))/3 - T0;
     
     if t(4,elnr)==1
-        D=hooke(1, Eglas, Nyglas);
-        es=alfa*Eglas*deltaT/(1-Nyglas)*[1 1 0];
+        D=hooke(1, EPmma, NyPmma);
+        es=alphaPMMA*EPmma*deltaT/(1-NyPmma)*[1 1 0];
     else
          D=hooke(1, Elins, Nylins);
-         es=alfa*Elins*deltaT/(1-Nylins)*[1 1 0];
+         es=alphaGlass*Elins*deltaT/(1-Nylins)*[1 1 0];
     end
-    [ke]=plante(ex(elnr,:), ey(elnr,:), ep, D);
+    ke=plante(ex(elnr,:), ey(elnr,:), ep, D);
     fe= plantf(ex(elnr,:), ey(elnr,:), ep, es);
     indx = edof_S(elnr,2:end);
-    Kt(indx,indx) = Kt(indx,indx)+ke;
-    f(indx) = f(indx) + fe;
+    Kt2(indx,indx) = Kt2(indx,indx)+ke;
+    f2(indx) = f2(indx) + fe;
    
 end
 
-vec1=[e(1,:) e(2,:)];
-u=unique(vec1)';
-u=sort(u);
-bc(:,1)=u;
-bc(:,2)=zeros(length(u),1);
-bc(:,3)=zeros(length(u),1);
-a=solveq(Kt,f,bc);
-ed=extract(edof_S,a);
+er = e([1 2 5],:); % Reduced e
+conv_segments = [5 4 6 1 8 2 7 3]; % Choosen boundary segments
+edges_conv = [];
+for i = 1:size(er,2)
+if ismember(er(3,i),conv_segments)
+edges_conv = [edges_conv er(1:2,i)];
+end
+end
+u=unique(edges_conv);
+bc=[];
+for i=1:length(u)
+    bc= [bc; dof_S(u(i),1) 0; dof_S(u(i), 2) 0];
+end
+
+a2=solveq(Kt2,f2,bc);
+%%a=zeros(length(a),1);
+ed2=extract(edof_S,a2);
+
+mag = 1000; % Magnification (due to small deformations)
+exd = ex + mag*ed2(:,1:2:end);
+eyd = ey + mag*ed2(:,2:2:end);
+figure()
+patch(ex',ey',[0 0 0],'EdgeColor','none','FaceAlpha',0.3)
+hold on
+patch(exd',eyd',[0 0 0],'FaceAlpha',0.3);
+axis equal
+title('Displacement field [Magnitude enhancement 100]')
+%%
+
 
 for elnr= 1:nelm
     
     deltaT=sum(ed(elnr,:))/3 - T0;
     
     if t(4,elnr)==1
-        D=hooke(1, Eglas, Nyglas);
-        es1=alfa*Eglas*deltaT/(1-Nyglas)*[1 1 0];
+        D=hooke(1, EPmma, NyPmma);
+        es1=alphaPMMA*EPmma*deltaT/(1-NyPmma)*[1 1 0];
     else
          D=hooke(1, Elins, Nylins);
-         es1=alfa*Elins*deltaT/(1-Nylins)*[1 1 0];
+         es1=alphaGlass*Elins*deltaT/(1-Nylins)*[1 1 0];
     end
     
-    [es,et]=plants(ex(elnr,:),ey(elnr,:),ep,D, ed(elnr,:));
+    [es,et]=plants(ex(elnr,:),ey(elnr,:),ep,D, ed2(elnr,:));
     Sigma(elnr,:)= es-es1;
-    Tao(elnr,:)=et;
 end
 sigx=Sigma(:,1);
 sigy=Sigma(:,2);
 tauxy=Sigma(:,3);
 
-Sigmatot=sqrt(sigx.^2 + sigy.^2 - sigx.*sigy + 3*tauxy);
 
-ed=extract(edof,Sigmatot);
-patch(ex', ey', ed');
+Sigmatot=sqrt(sigx.^2 + sigy.^2 - sigx.*sigy + 3*tauxy.^2);
 
- 
+for i=1:size(coord,1)
+[c0,c1]=find(edof(:,2:4)==i);
+Seff_nod(i,1)=sum(Sigmatot(c0))/size(c0,1);
+end
+
+
+ed3=extract(edof,Seff_nod);
+figure()
+patch(ex', ey', ed3');
+colorbar;
+
+
 
 
 
