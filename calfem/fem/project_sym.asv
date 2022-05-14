@@ -138,7 +138,141 @@ for elnr= 1:nelm
    
 end
 
-er = e([1 2 5],:); % Reduced e
+er = e_sym([1 2 5],:); % Reduced e
+conv_segments = [7 2 8 3 1]; % Choosen boundary segments
+edges_conv1 = [];
+for i = 1:size(er,2)
+if ismember(er(3,i),conv_segments)
+edges_conv1 = [edges_conv1 er(1:2,i)];
+end
+end
+
+er = e_sym([1 2 5],:); % Reduced e
+conv_segments = [4 5 6]; % Choosen boundary segments
+edges_conv2 = [];
+for i = 1:size(er,2)
+if ismember(er(3,i),conv_segments)
+edges_conv2 = [edges_conv2 er(1:2,i)];
+end
+end
+
+u1=unique(edges_conv1);
+u2=unique(edges_conv2);
+bc=[];
+for i=1:length(u1)
+    bc= [bc; dof_S(u1(i),1) 0; dof_S(u1(i), 2) 0];
+end
+
+for i=1:length(u2)
+    bc= [bc;dof_S(u2(i),2) 0];
+end
+
+bc1=unique(bc(:,1));
+bc1=[bc1, zeros(length(bc1),1)];
+
+a2=solveq(Kt2,f2,bc1);
+%%a=zeros(length(a),1);
+ed2=extract(edof_S,a2);
+
+mag = 5000; % Magnification (due to small deformations)
+exd = ex + mag*ed2(:,1:2:end);
+eyd = ey + mag*ed2(:,2:2:end);
+figure()
+patch(ex',ey',[0 0 0],'EdgeColor','none','FaceAlpha',0.3)
+hold on
+patch(exd',eyd',[0 0 0],'FaceAlpha',0.3);
+
+patch(exd',-0.01-eyd',[0 0 0],'EdgeColor', 'none','FaceAlpha',0.3);
+hold on
+patch(exd',-0.01-eyd',[0 0 0],'FaceAlpha',0.3);
+
+axis equal
+title('Displacement field [Magnitude enhancement 100]')
+%% Part C. Plot of von Mises stress field.
+for elnr= 1:nelm
+    
+    deltaT=sum(ed(elnr,:))/3 - T0;
+    
+    if t_sym(4,elnr)==1
+        D=hooke(1, EPmma, NyPmma);
+        es1=alphaPMMA*EPmma*deltaT/(1-NyPmma)*[1 1 0];
+    else
+         D=hooke(1, Elins, Nylins);
+         es1=alphaGlass*Elins*deltaT/(1-Nylins)*[1 1 0];
+    end
+    
+    [es,et]=plants(ex(elnr,:),ey(elnr,:),ep,D, ed2(elnr,:));
+    Sigma(elnr,:)= es-es1;
+end
+sigx=Sigma(:,1);
+sigy=Sigma(:,2);
+tauxy=Sigma(:,3);
+
+
+Sigmatot=sqrt(sigx.^2 + sigy.^2 - sigx.*sigy + 3*tauxy.^2);
+
+for i=1:size(coord,1)
+[c0,c1]=find(edof(:,2:4)==i);
+Seff_nod(i,1)=sum(Sigmatot(c0))/size(c0,1);
+end
+
+
+ed3=extract(edof,Seff_nod);
+figure()
+patch(ex', ey', ed3');
+patch(ex', -0.01-ey', ed3');
+colorbar;
+%% Part D. Spring boundaries.
+T0= 20+273;
+Q=3*10^6;
+nen=3;
+ep=[1 0.5*0.01];
+C=zeros(nnod);
+EPmma=2.8*10^9;
+NyPmma=0.35;
+Elins=67*10^9;
+Nylins=0.2;
+alphaPMMA=70*10^-6;
+alphaGlass=7*10^-6;
+Kt3=zeros(nnod*2);
+[ex, ey]=coordxtr(edof, coord, dof, nen);
+Kc = diag(ones(2,1),2) + diag(ones(2,1),-2)+ 2*diag(ones(4,1),0);
+
+for elnr= 1:nelm
+    
+    deltaT=sum(ed(elnr,:))/3 - T0;
+    
+    if t_sym(4,elnr)==1
+        D=hooke(1, EPmma, NyPmma);
+        es=alphaPMMA*EPmma*deltaT/(1-NyPmma)*[1 1 0];
+    else
+         D=hooke(1, Elins, Nylins);
+         es=alphaGlass*Elins*deltaT/(1-Nylins)*[1 1 0];
+    end
+    
+    ke=plante(ex(elnr,:), ey(elnr,:), ep, D);
+    fe= plantf(ex(elnr,:), ey(elnr,:), ep, es);
+    indx = edof_S(elnr,2:end);
+    Kt2(indx,indx) = Kt2(indx,indx)+ke;
+    f2(indx) = f2(indx) + fe;
+   
+    for i=1:length(er)
+        if sum(ismember(er(1:2,i), edges_conv1))==2
+           ind1=er(1,i);
+           ind2=er(2,i);
+           L = sqrt((p_sym(1,ind1)-p_sym(1,ind2))^2 +(p_sym(2,ind1)-p_sym(2,ind2))^2);
+           Kce = Kc*L/6;
+           indx1=dof_S(ind1,:);
+           indx2=dof_S(ind2,:);
+           indtot=[indx1 indx2];
+           Kt3(indtot,indtot)=Kt3(indtot,indtot)+Kce;
+        end
+    end
+    
+    
+end
+
+er = e_sym([1 2 5],:); % Reduced e
 conv_segments = [5 4 6 1 8 2 7 3]; % Choosen boundary segments
 edges_conv = [];
 for i = 1:size(er,2)
@@ -151,17 +285,56 @@ bc=[];
 for i=1:length(u)
     bc= [bc; dof_S(u(i),1) 0; dof_S(u(i), 2) 0];
 end
+Ktot=Kt2-Kt3;
+a3=solveq(Ktot,f2);
 
-a2=solveq(Kt2,f2,bc);
-%%a=zeros(length(a),1);
-ed2=extract(edof_S,a2);
+ed3=extract(edof_S,a3);
 
-mag = 1000; % Magnification (due to small deformations)
-exd = ex + mag*ed2(:,1:2:end);
-eyd = ey + mag*ed2(:,2:2:end);
+mag = 100; % Magnification (due to small deformations)
+exd = ex + mag*ed3(:,1:2:end);
+eyd = ey + mag*ed3(:,2:2:end);
 figure()
 patch(ex',ey',[0 0 0],'EdgeColor','none','FaceAlpha',0.3)
 hold on
 patch(exd',eyd',[0 0 0],'FaceAlpha',0.3);
+patch(ex',-0.01-ey',[0 0 0],'EdgeColor','none','FaceAlpha',0.3)
+hold on
+patch(exd',-0.01-eyd',[0 0 0],'FaceAlpha',0.3);
 axis equal
 title('Displacement field [Magnitude enhancement 100]')
+
+ed2=ed3;
+
+for elnr= 1:nelm
+    
+    deltaT=sum(ed(elnr,:))/3 - T0;
+    
+    if t_sym(4,elnr)==1
+        D=hooke(1, EPmma, NyPmma);
+        es1=alphaPMMA*EPmma*deltaT/(1-NyPmma)*[1 1 0];
+    else
+         D=hooke(1, Elins, Nylins);
+         es1=alphaGlass*Elins*deltaT/(1-Nylins)*[1 1 0];
+    end
+    
+    [es,et]=plants(ex(elnr,:),ey(elnr,:),ep,D, ed2(elnr,:));
+    Sigma(elnr,:)= es-es1;
+end
+sigx=Sigma(:,1);
+sigy=Sigma(:,2);
+tauxy=Sigma(:,3);
+
+
+Sigmatot=sqrt(sigx.^2 + sigy.^2 - sigx.*sigy + 3*tauxy.^2);
+
+for i=1:size(coord,1)
+[c0,c1]=find(edof(:,2:4)==i);
+Seff_nod(i,1)=sum(Sigmatot(c0))/size(c0,1);
+end
+
+ed3=extract(edof,Seff_nod);
+figure()
+patch(ex', ey', ed3');
+patch(ex', -0.01-ey', ed3');
+colorbar;
+
