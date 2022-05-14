@@ -1,28 +1,34 @@
-load e.mat
-load p.mat
-load t.mat
+%% Project FEM %%
+% Code for using the symmetry boundary conditions.
+% Start reading the files t_sym.mat, p_sym.mat, e_sym.mat
 
-coord=0.01*p';
-enod=t(1:3,:)'; % nodes of elements
-nelm=size(enod,1); % number of elements
-nnod=size(coord,1); % number of nodes
-dof=(1:nnod)'; % dof number is node number
-dof_S=[(1:nnod)',(nnod+1:2*nnod)']; % give each dof a number
+%% Part A. Stationary temperature distribution
+load 't_sym.mat'
+load 'p_sym.mat'
+load 'e_sym.mat'
+
+coord=0.01*p_sym'; % Correct coordinates to meters
+enod=t_sym(1:3,:)'; % Nodes of elements
+nelm=size(enod,1); % Number of elements
+nnod=size(coord,1); % Number of nodes
+dof=(1:nnod)'; % Dof number is node number
+dof_S=[(1:nnod)',(nnod+1:2*nnod)']; % Give each dof a number
+
 for ie=1:nelm
-edof_S(ie,:)=[ie dof_S(enod(ie,1),:), dof_S(enod(ie,2),:),dof_S(enod(ie,3),:)];
-edof(ie,:)=[ie,enod(ie,:)];
+    edof_S(ie,:)=[ie dof_S(enod(ie,1),:), dof_S(enod(ie,2),:),dof_S(enod(ie,3),:)];
+    edof(ie,:)=[ie,enod(ie,:)];
 end
-
-er = e([1 2 5],:); % Reduced e
+er = e_sym([1 2 5],:); % Reduced e
 
 conv_segments = [10 11 12];   % Choosen boundary segments
 edges_conv = [];
 for i = 1:size(er,2)
-if ismember(er(3,i),conv_segments)
-edges_conv = [edges_conv er(1:2,i)];
-end
+    if ismember(er(3,i),conv_segments)
+        edges_conv = [edges_conv er(1:2,i)];
+    end
 end
 
+% Initializing constants and matrices
 ndof= nelm +1;
 Kt=zeros(nnod);
 f=zeros(nnod,1);
@@ -35,13 +41,12 @@ Q=3*10^6;
 nen=3;
 ep=[0.5*0.01];
 C=zeros(nnod);
-
 D=eye(2);
-
 [ex, ey]=coordxtr(edof, coord, dof, nen);
+
 for elnr= 1:nelm
     
-    if t(4,elnr)==1
+    if t_sym(4,elnr)==1
         Q=0;
         kparam=kpmma;
         c_rho=1466*1185;
@@ -64,23 +69,28 @@ end
 a = solveq(Kt,f);
 ed=extract(edof,a);
 patch(ex', ey', ed');
+patch(ex', -ey'-0.01, ed');
+colorbar;
+
+%% Part B. Transient temperature distribution
 
 %%
-a0=293*ones(nnod,1);
-deltat=1;
+a0=293*ones(nnod,1); % Set temperature in all nodes to 20 degrees
+deltat=1; % 1s timestep
 a_prev=a0;
 f_next=f;
 
 
 for i=1:5
-a_next= (C+deltat.*Kt)\(C*a_prev+deltat.*f_next);
-a_prev=a_next;
+    a_next= (C+deltat.*Kt)\(C*a_prev+deltat.*f_next);
+    a_prev=a_next;
 end
 
 eT=extract(edof,a_next);
 
 figure()
 patch(ex',ey',eT','EdgeColor','none')
+patch(ex',-0.01-ey',eT','EdgeColor','none')
 title('Temperature distribution [C]')
 colormap();
 colorbar;
@@ -88,7 +98,7 @@ hold on
 xlabel('x-position [m]')
 caxis([290 300]);
 
-%% Del 3
+%% Part C. Effective von Mises stress field
 
 Kt2=zeros(nnod*2);
 f2=zeros(nnod*2,1);
@@ -113,7 +123,7 @@ for elnr= 1:nelm
     
     deltaT=sum(ed(elnr,:))/3 - T0;
     
-    if t(4,elnr)==1
+    if t_sym(4,elnr)==1
         D=hooke(1, EPmma, NyPmma);
         es=alphaPMMA*EPmma*deltaT/(1-NyPmma)*[1 1 0];
     else
@@ -128,7 +138,7 @@ for elnr= 1:nelm
    
 end
 
-er = e([1 2 5],:); % Reduced e
+er = e_sym([1 2 5],:); % Reduced e
 conv_segments = [5 4 6 1 8 2 7 3]; % Choosen boundary segments
 edges_conv = [];
 for i = 1:size(er,2)
@@ -151,17 +161,21 @@ exd = ex + mag*ed2(:,1:2:end);
 eyd = ey + mag*ed2(:,2:2:end);
 figure()
 patch(ex',ey',[0 0 0],'EdgeColor','none','FaceAlpha',0.3)
+
 hold on
 patch(exd',eyd',[0 0 0],'FaceAlpha',0.3);
+patch(exd',-0.01-eyd',[0 0 0],'FaceAlpha',0.3);
+
 axis equal
 title('Displacement field [Magnitude enhancement 100]')
-%%
+
+%% Part D. Spring boundaries
 
 for elnr= 1:nelm
     
     deltaT=sum(ed(elnr,:))/3 - T0;
     
-    if t(4,elnr)==1
+    if t_sym(4,elnr)==1
         D=hooke(1, EPmma, NyPmma);
         es1=alphaPMMA*EPmma*deltaT/(1-NyPmma)*[1 1 0];
     else
@@ -188,14 +202,7 @@ end
 ed3=extract(edof,Seff_nod);
 figure()
 patch(ex', ey', ed3');
+patch(ex', -0.01-ey', ed3');
 colorbar;
-
-
-
-
-
-
-
-
 
 
