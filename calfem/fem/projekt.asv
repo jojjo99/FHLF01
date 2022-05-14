@@ -157,6 +157,7 @@ axis equal
 title('Displacement field [Magnitude enhancement 100]')
 %% Plot av von Mises stress
 
+
 for elnr= 1:nelm
     
     deltaT=sum(ed(elnr,:))/3 - T0;
@@ -253,55 +254,20 @@ bc=[];
 for i=1:length(u)
     bc= [bc; dof_S(u(i),1) 0; dof_S(u(i), 2) 0];
 end
-Ktot=Kt2-Kt3;
-a3=solveq(Ktot,f2);
+
+a3=solveq(Kt2-Kt3,f2);
 
 ed3=extract(edof_S,a3);
 
 mag = 100; % Magnification (due to small deformations)
-exd = ex + mag*ed3(:,1:2:end);
-eyd = ey + mag*ed3(:,2:2:end);
+exd = ex + mag*ed2(:,1:2:end);
+eyd = ey + mag*ed2(:,2:2:end);
 figure()
 patch(ex',ey',[0 0 0],'EdgeColor','none','FaceAlpha',0.3)
 hold on
 patch(exd',eyd',[0 0 0],'FaceAlpha',0.3);
 axis equal
 title('Displacement field [Magnitude enhancement 100]')
-
-ed2=ed3;
-
-for elnr= 1:nelm
-    
-    deltaT=sum(ed(elnr,:))/3 - T0;
-    
-    if t(4,elnr)==1
-        D=hooke(1, EPmma, NyPmma);
-        es1=alphaPMMA*EPmma*deltaT/(1-NyPmma)*[1 1 0];
-    else
-         D=hooke(1, Elins, Nylins);
-         es1=alphaGlass*Elins*deltaT/(1-Nylins)*[1 1 0];
-    end
-    
-    [es,et]=plants(ex(elnr,:),ey(elnr,:),ep,D, ed2(elnr,:));
-    Sigma(elnr,:)= es-es1;
-end
-sigx=Sigma(:,1);
-sigy=Sigma(:,2);
-tauxy=Sigma(:,3);
-
-
-Sigmatot=sqrt(sigx.^2 + sigy.^2 - sigx.*sigy + 3*tauxy.^2);
-
-for i=1:size(coord,1)
-[c0,c1]=find(edof(:,2:4)==i);
-Seff_nod(i,1)=sum(Sigmatot(c0))/size(c0,1);
-end
-
-
-ed3=extract(edof,Seff_nod);
-figure()
-patch(ex', ey', ed3');
-colorbar;
 %Loopa i elementen,
 % Kolla om två noder på rand
 % Calc length, 
