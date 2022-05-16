@@ -200,6 +200,7 @@ xlabel('x-position [m]')
 ylabel('y-position [m]')
 
 %% Part C. Effective von Mises stress field.
+ed2=extract(edof_S,a2);
 for elnr= 1:nelm
     
     deltaT=sum(ed(elnr,:))/3 - T0;
