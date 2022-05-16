@@ -30,33 +30,33 @@ end
 
 % Initializing constants and matrices
 ndof= nelm +1;
+nen=3;
 Kt=zeros(nnod);
 f=zeros(nnod,1);
-kpmma=2.8;
-kglas=0.8;
-q=0;
-alfa=100;
-T0= 20+273;
+kPMMA=2.8;
+kGLASS=0.8;
+alpha=100;
+T0= 293;
 Q=3*10^6;
-nen=3;
 ep=[0.5*0.01];
 C=zeros(nnod);
 D=eye(2);
 [ex, ey]=coordxtr(edof, coord, dof, nen);
 
+% Calculating and assembling K and f matrices
 for elnr= 1:nelm
     
     if t_sym(4,elnr)==1
         Q=0;
-        kparam=kpmma;
+        kparam=kPMMA;
         c_rho=1466*1185;
     else
         Q=3*10^6;
-        kparam=kglas;
+        kparam=kGLASS;
         c_rho=670*3860;
     end
-    [k, fe]=flw2te(ex(elnr,:), ey(elnr,:), ep, kparam.*D, Q+(alfa*T0)/ep(1));
-    kc=plantml(ex(elnr,:), ey(elnr,:), alfa);
+    [k, fe]=flw2te(ex(elnr,:), ey(elnr,:), ep, kparam.*D, Q+(alpha*T0)/ep(1));
+    kc=plantml(ex(elnr,:), ey(elnr,:), alpha);
     Ce=plantml(ex(elnr,:), ey(elnr,:), c_rho*ep);
     Kte=k+kc;
     indx = edof(elnr,2:end);
@@ -66,23 +66,26 @@ for elnr= 1:nelm
     
 end
 
+% Solving the diffenrential equation
 a = solveq(Kt,f);
 ed=extract(edof,a);
 patch(ex', ey', ed');
 patch(ex', -ey'-0.01, ed');
 colorbar;
-
+xlabel('x-position [m]');
+ylabel('y-position [m]');
+title('Temperature distribution [K]')
 %% Part B. Transient temperature distribution
 
 %%
-a0=293*ones(nnod,1); % Set temperature in all nodes to 20 degrees
-deltat=1; % 1s timestep
+a0=293*ones(nnod,1); % Set temperature in all nodes to 293 K
+delta_t=1; % 1s timestep
 a_prev=a0;
 f_next=f;
 
-
+% Numerical integration
 for i=1:5
-    a_next= (C+deltat.*Kt)\(C*a_prev+deltat.*f_next);
+    a_next= (C+delta_t.*Kt)\(C*a_prev+delta_t.*f_next);
     a_prev=a_next;
 end
 
@@ -91,31 +94,31 @@ eT=extract(edof,a_next);
 figure()
 patch(ex',ey',eT','EdgeColor','none')
 patch(ex',-0.01-ey',eT','EdgeColor','none')
-title('Temperature distribution [C]')
+title('Temperature distribution [K]')
 colormap();
 colorbar;
 hold on
 xlabel('x-position [m]')
+ylabel('y-position [m]')
 caxis([290 300]);
 
-%% Part C. Effective von Mises stress field
+%% Part C. Displacement field, fixed boundaries.
 
 Kt2=zeros(nnod*2);
 f2=zeros(nnod*2,1);
-kpmma=2.8;
-kglas=0.8;
-q=0;
-T0= 20+273;
+kPMMA=2.8;
+kGLASS=0.8;
+T0= 293;
 Q=3*10^6;
 nen=3;
 ep=[1 0.5*0.01];
 C=zeros(nnod);
-EPmma=2.8*10^9;
-NyPmma=0.35;
-Elins=67*10^9;
-Nylins=0.2;
+EPMMA=2.8*10^9;
+NyPMMA=0.35;
+EGLASS=67*10^9;
+NyGLASS=0.2;
 alphaPMMA=70*10^-6;
-alphaGlass=7*10^-6;
+alphaGLASS=7*10^-6;
 
 
 [ex, ey]=coordxtr(edof, coord, dof, nen);
@@ -124,11 +127,11 @@ for elnr= 1:nelm
     deltaT=sum(ed(elnr,:))/3 - T0;
     
     if t_sym(4,elnr)==1
-        D=hooke(1, EPmma, NyPmma);
-        es=alphaPMMA*EPmma*deltaT/(1-NyPmma)*[1 1 0];
+        D=hooke(1, EPMMA, NyPMMA);
+        es=alphaPMMA*EPMMA*deltaT/(1-NyPMMA)*[1 1 0];
     else
-         D=hooke(1, Elins, Nylins);
-         es=alphaGlass*Elins*deltaT/(1-Nylins)*[1 1 0];
+         D=hooke(1, EGLASS, NyGLASS);
+         es=alphaGLASS*EGLASS*deltaT/(1-NyGLASS)*[1 1 0];
     end
     ke=plante(ex(elnr,:), ey(elnr,:), ep, D);
     fe= plantf(ex(elnr,:), ey(elnr,:), ep, es);
@@ -138,6 +141,7 @@ for elnr= 1:nelm
    
 end
 
+% Finding nodes on the boundary
 er = e_sym([1 2 5],:); % Reduced e
 conv_segments = [7 2 8 3 1]; % Choosen boundary segments
 edges_conv1 = [];
@@ -147,6 +151,7 @@ edges_conv1 = [edges_conv1 er(1:2,i)];
 end
 end
 
+% Finding nodes on the symmetry line
 er = e_sym([1 2 5],:); % Reduced e
 conv_segments = [4 5 6]; % Choosen boundary segments
 edges_conv2 = [];
@@ -159,6 +164,8 @@ end
 u1=unique(edges_conv1);
 u2=unique(edges_conv2);
 bc=[];
+
+% Setting the degree of freedom in y-direction to zero
 for i=1:length(u1)
     bc= [bc; dof_S(u1(i),1) 0; dof_S(u1(i), 2) 0];
 end
@@ -167,38 +174,37 @@ for i=1:length(u2)
     bc= [bc;dof_S(u2(i),2) 0];
 end
 
-bc1=unique(bc(:,1));
+bc1=unique(bc','rows');
 bc1=[bc1, zeros(length(bc1),1)];
 
-a2=solveq(Kt2,f2,bc1);
-%%a=zeros(length(a),1);
+a2=solveq(Kt2,f2,bc);
 ed2=extract(edof_S,a2);
 
-mag = 5000; % Magnification (due to small deformations)
+mag = 100; % Magnification (due to small deformations)
 exd = ex + mag*ed2(:,1:2:end);
 eyd = ey + mag*ed2(:,2:2:end);
 figure()
 patch(ex',ey',[0 0 0],'EdgeColor','none','FaceAlpha',0.3)
 hold on
 patch(exd',eyd',[0 0 0],'FaceAlpha',0.3);
-
 patch(exd',-0.01-eyd',[0 0 0],'EdgeColor', 'none','FaceAlpha',0.3);
 hold on
 patch(exd',-0.01-eyd',[0 0 0],'FaceAlpha',0.3);
-
 axis equal
 title('Displacement field [Magnitude enhancement 100]')
-%% Part C. Plot of von Mises stress field.
+xlabel('x-position [m]')
+ylabel('y-position [m]')
+%% Part C. Effective von Mises stress field.
 for elnr= 1:nelm
     
     deltaT=sum(ed(elnr,:))/3 - T0;
     
     if t_sym(4,elnr)==1
-        D=hooke(1, EPmma, NyPmma);
-        es1=alphaPMMA*EPmma*deltaT/(1-NyPmma)*[1 1 0];
+        D=hooke(1, EPMMA, NyPMMA);
+        es1=alphaPMMA*EPMMA*deltaT/(1-NyPMMA)*[1 1 0];
     else
-         D=hooke(1, Elins, Nylins);
-         es1=alphaGlass*Elins*deltaT/(1-Nylins)*[1 1 0];
+         D=hooke(1, EGLASS, NyGLASS);
+         es1=alphaGLASS*EGLASS*deltaT/(1-NyGLASS)*[1 1 0];
     end
     
     [es,et]=plants(ex(elnr,:),ey(elnr,:),ep,D, ed2(elnr,:));
@@ -211,6 +217,7 @@ tauxy=Sigma(:,3);
 
 Sigmatot=sqrt(sigx.^2 + sigy.^2 - sigx.*sigy + 3*tauxy.^2);
 
+% Calculating stress of the nodal points
 for i=1:size(coord,1)
 [c0,c1]=find(edof(:,2:4)==i);
 Seff_nod(i,1)=sum(Sigmatot(c0))/size(c0,1);
@@ -222,32 +229,37 @@ figure()
 patch(ex', ey', ed3');
 patch(ex', -0.01-ey', ed3');
 colorbar;
+title('Effective von Mises stress field [Pa]')
+xlabel('x-position [m]')
+ylabel('y-position [m]')
 %% Part D. Spring boundaries.
 T0= 20+273;
 Q=3*10^6;
 nen=3;
 ep=[1 0.5*0.01];
 C=zeros(nnod);
-EPmma=2.8*10^9;
-NyPmma=0.35;
-Elins=67*10^9;
-Nylins=0.2;
+EPMMA=2.8*10^9;
+NyPMMA=0.35;
+EGLASS=67*10^9;
+NyGLASS=0.2;
 alphaPMMA=70*10^-6;
-alphaGlass=7*10^-6;
+alphaGLASS=7*10^-6;
 Kt3=zeros(nnod*2);
 [ex, ey]=coordxtr(edof, coord, dof, nen);
 Kc = diag(ones(2,1),2) + diag(ones(2,1),-2)+ 2*diag(ones(4,1),0);
+kspring=-1000;
+
 
 for elnr= 1:nelm
     
     deltaT=sum(ed(elnr,:))/3 - T0;
     
     if t_sym(4,elnr)==1
-        D=hooke(1, EPmma, NyPmma);
-        es=alphaPMMA*EPmma*deltaT/(1-NyPmma)*[1 1 0];
+        D=hooke(1, EPMMA, NyPMMA);
+        es=alphaPMMA*EPMMA*deltaT/(1-NyPMMA)*[1 1 0];
     else
-         D=hooke(1, Elins, Nylins);
-         es=alphaGlass*Elins*deltaT/(1-Nylins)*[1 1 0];
+         D=hooke(1, EGLASS, NyGLASS);
+         es=alphaGLASS*EGLASS*deltaT/(1-NyGLASS)*[1 1 0];
     end
     
     ke=plante(ex(elnr,:), ey(elnr,:), ep, D);
@@ -261,7 +273,7 @@ for elnr= 1:nelm
            ind1=er(1,i);
            ind2=er(2,i);
            L = sqrt((p_sym(1,ind1)-p_sym(1,ind2))^2 +(p_sym(2,ind1)-p_sym(2,ind2))^2);
-           Kce = Kc*L/6;
+           Kce = Kc*L/6*kspring*0.005;
            indx1=dof_S(ind1,:);
            indx2=dof_S(ind2,:);
            indtot=[indx1 indx2];
@@ -273,7 +285,7 @@ for elnr= 1:nelm
 end
 
 er = e_sym([1 2 5],:); % Reduced e
-conv_segments = [5 4 6 1 8 2 7 3]; % Choosen boundary segments
+conv_segments = [4 5 6]; % Choosen boundary segments
 edges_conv = [];
 for i = 1:size(er,2)
 if ismember(er(3,i),conv_segments)
@@ -283,10 +295,10 @@ end
 u=unique(edges_conv);
 bc=[];
 for i=1:length(u)
-    bc= [bc; dof_S(u(i),1) 0; dof_S(u(i), 2) 0];
+    bc= [bc;dof_S(u2(i),2) 0];
 end
 Ktot=Kt2-Kt3;
-a3=solveq(Ktot,f2);
+a3=solveq(Ktot,f2,bc);
 
 ed3=extract(edof_S,a3);
 
@@ -302,6 +314,8 @@ hold on
 patch(exd',-0.01-eyd',[0 0 0],'FaceAlpha',0.3);
 axis equal
 title('Displacement field [Magnitude enhancement 100]')
+xlabel('x-position [m]')
+ylabel('y-position [m]')
 
 ed2=ed3;
 
@@ -310,11 +324,11 @@ for elnr= 1:nelm
     deltaT=sum(ed(elnr,:))/3 - T0;
     
     if t_sym(4,elnr)==1
-        D=hooke(1, EPmma, NyPmma);
-        es1=alphaPMMA*EPmma*deltaT/(1-NyPmma)*[1 1 0];
+        D=hooke(1, EPMMA, NyPMMA);
+        es1=alphaPMMA*EPMMA*deltaT/(1-NyPMMA)*[1 1 0];
     else
-         D=hooke(1, Elins, Nylins);
-         es1=alphaGlass*Elins*deltaT/(1-Nylins)*[1 1 0];
+         D=hooke(1, EGLASS, NyGLASS);
+         es1=alphaGLASS*EGLASS*deltaT/(1-NyGLASS)*[1 1 0];
     end
     
     [es,et]=plants(ex(elnr,:),ey(elnr,:),ep,D, ed2(elnr,:));
@@ -337,4 +351,7 @@ figure()
 patch(ex', ey', ed3');
 patch(ex', -0.01-ey', ed3');
 colorbar;
+title('Effective von Mises stress field [Pa]')
+xlabel('x-position [m]')
+ylabel('y-position [m]')
 
