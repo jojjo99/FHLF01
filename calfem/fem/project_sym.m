@@ -56,8 +56,8 @@ for elnr= 1:nelm
         c_rho=670*3860;
     end
     [k, fe]=flw2te(ex(elnr,:), ey(elnr,:), ep, kparam.*D, Q+(alpha*T0)/ep(1));
-    kc=plantml(ex(elnr,:), ey(elnr,:), alpha);
-    Ce=plantml(ex(elnr,:), ey(elnr,:), c_rho*ep);
+    kc=plantml(ex(elnr,:), ey(elnr,:), alpha); %% element convection k matrix
+    Ce=plantml(ex(elnr,:), ey(elnr,:), c_rho*ep); %%for time integration
     Kte=k+kc;
     indx = edof(elnr,2:end);
     Kt(indx,indx) = Kt(indx,indx)+Kte;
@@ -69,14 +69,15 @@ end
 % Solving the diffenrential equation
 a = solveq(Kt,f);
 ed=extract(edof,a);
-patch(ex', ey', ed');
-patch(ex', -ey'-0.01, ed');
+patch(ex', ey', ed', 'Edgecolor', 'none');
+patch(ex', -ey'-0.01, ed', 'Edgecolor', 'none');
+colormap();
 cbar=colorbar;
 xlabel('x-position [m]');
 ylabel('y-position [m]');
 cbar.Title.String = 'Temperature [K]';
 str = 'Label2';
-set(get(c1, 'xlabel'), 'string', str, 'rotation', 0);
+set(get(cbar, 'xlabel'), 'string', str, 'rotation', 0);
 %% Part B. Transient temperature distribution
 
 %%
@@ -86,7 +87,7 @@ a_prev=a0;
 f_next=f;
 
 % Numerical integration
-for i=1:5
+for i=1:20
     a_next= (C+delta_t.*Kt)\(C*a_prev+delta_t.*f_next);
     a_prev=a_next;
 end
@@ -96,13 +97,15 @@ eT=extract(edof,a_next);
 figure()
 patch(ex',ey',eT','EdgeColor','none')
 patch(ex',-0.01-ey',eT','EdgeColor','none')
-title('Temperature distribution [K]')
 colormap();
-colorbar;
+cbar=colorbar;
 hold on
 xlabel('x-position [m]')
 ylabel('y-position [m]')
 caxis([290 300]);
+cbar.Title.String = 'Temperature [K]';
+str = 'Label2';
+set(get(cbar, 'xlabel'), 'string', str, 'rotation', 0);
 
 %% Part C. Displacement field, fixed boundaries.
 
@@ -182,7 +185,7 @@ bc1=[bc1, zeros(length(bc1),1)];
 a2=solveq(Kt2,f2,bc);
 ed2=extract(edof_S,a2);
 
-mag = 100; % Magnification (due to small deformations)
+mag = 2000; % Magnification (due to small deformations)
 exd = ex + mag*ed2(:,1:2:end);
 eyd = ey + mag*ed2(:,2:2:end);
 figure()
@@ -193,9 +196,9 @@ patch(exd',-0.01-eyd',[0 0 0],'EdgeColor', 'none','FaceAlpha',0.3);
 hold on
 patch(exd',-0.01-eyd',[0 0 0],'FaceAlpha',0.3);
 axis equal
-title('Displacement field [Magnitude enhancement 100]')
 xlabel('x-position [m]')
 ylabel('y-position [m]')
+
 %% Part C. Effective von Mises stress field.
 for elnr= 1:nelm
     
@@ -225,15 +228,17 @@ for i=1:size(coord,1)
 Seff_nod(i,1)=sum(Sigmatot(c0))/size(c0,1);
 end
 
-
 ed3=extract(edof,Seff_nod);
+ed3=ed3./10^6;
+
 figure()
-patch(ex', ey', ed3');
-patch(ex', -0.01-ey', ed3');
-colorbar;
-title('Effective von Mises stress field [Pa]')
+patch(ex', ey', ed3', 'Edgecolor', 'none');
+patch(ex', -0.01-ey', ed3', 'Edgecolor', 'none');
+cbar=colorbar;
 xlabel('x-position [m]')
 ylabel('y-position [m]')
+cbar.Title.String = 'Stress [MPa]';
+
 %% Part D. Spring boundaries.
 T0= 20+273;
 Q=3*10^6;
@@ -302,11 +307,11 @@ end
 Ktot=Kt2-Kt3;
 a3=solveq(Ktot,f2,bc);
 
-ed3=extract(edof_S,a3);
+ed4=extract(edof_S,a3);
 
 mag = 100; % Magnification (due to small deformations)
-exd = ex + mag*ed3(:,1:2:end);
-eyd = ey + mag*ed3(:,2:2:end);
+exd = ex + mag*ed4(:,1:2:end);
+eyd = ey + mag*ed4(:,2:2:end);
 figure()
 patch(ex',ey',[0 0 0],'EdgeColor','none','FaceAlpha',0.3)
 hold on
@@ -315,11 +320,10 @@ patch(ex',-0.01-ey',[0 0 0],'EdgeColor','none','FaceAlpha',0.3)
 hold on
 patch(exd',-0.01-eyd',[0 0 0],'FaceAlpha',0.3);
 axis equal
-title('Displacement field [Magnitude enhancement 100]')
 xlabel('x-position [m]')
 ylabel('y-position [m]')
 
-ed2=ed3;
+ed2=ed4;
 
 for elnr= 1:nelm
     
@@ -348,12 +352,15 @@ for i=1:size(coord,1)
 Seff_nod(i,1)=sum(Sigmatot(c0))/size(c0,1);
 end
 
-ed3=extract(edof,Seff_nod);
+ed5=extract(edof,Seff_nod);
+ed5=ed5./10^6;
+
 figure()
-patch(ex', ey', ed3');
-patch(ex', -0.01-ey', ed3');
-colorbar;
+patch(ex', ey', ed5', 'Edgecolor', 'none');
+patch(ex', -0.01-ey', ed5', 'Edgecolor', 'none');
+cbar=colorbar;
 title('Effective von Mises stress field [Pa]')
 xlabel('x-position [m]')
 ylabel('y-position [m]')
+cbar.Title.String = 'Stress [MPa]';
 
