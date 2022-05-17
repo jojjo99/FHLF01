@@ -76,8 +76,6 @@ cbar=colorbar;
 xlabel('x-position [m]');
 ylabel('y-position [m]');
 cbar.Title.String = 'Temperature [K]';
-str = 'Label2';
-set(get(cbar, 'xlabel'), 'string', str, 'rotation', 0);
 %% Part B. Transient temperature distribution
 
 %%
@@ -85,11 +83,15 @@ a0=293*ones(nnod,1); % Set temperature in all nodes to 293 K
 delta_t=1; % 1s timestep
 a_prev=a0;
 f_next=f;
+temp_evo=zeros(1,1800);
+temp_evo_time=[1:1800];
 
 % Numerical integration
-for i=1:20
+for i=1:1800
     a_next= (C+delta_t.*Kt)\(C*a_prev+delta_t.*f_next);
     a_prev=a_next;
+    amean= mean(a_prev);
+    temp_evo(i)= amean;
 end
 
 eT=extract(edof,a_next);
@@ -102,10 +104,13 @@ cbar=colorbar;
 hold on
 xlabel('x-position [m]')
 ylabel('y-position [m]')
-caxis([290 300]);
 cbar.Title.String = 'Temperature [K]';
-str = 'Label2';
-set(get(cbar, 'xlabel'), 'string', str, 'rotation', 0);
+
+figure()
+plot(temp_evo_time, temp_evo);
+ylim([290 330]);
+xlabel('Time [s]');
+ylabel('Temperature [K]');
 
 %% Part C. Displacement field, fixed boundaries.
 
@@ -185,14 +190,14 @@ bc1=[bc1, zeros(length(bc1),1)];
 a2=solveq(Kt2,f2,bc);
 ed2=extract(edof_S,a2);
 
-mag = 2000; % Magnification (due to small deformations)
+mag = 1; % Magnification (due to small deformations)
 exd = ex + mag*ed2(:,1:2:end);
 eyd = ey + mag*ed2(:,2:2:end);
 figure()
 patch(ex',ey',[0 0 0],'EdgeColor','none','FaceAlpha',0.3)
 hold on
 patch(exd',eyd',[0 0 0],'FaceAlpha',0.3);
-patch(exd',-0.01-eyd',[0 0 0],'EdgeColor', 'none','FaceAlpha',0.3);
+patch(ex',-0.01-ey',[0 0 0],'EdgeColor', 'none','FaceAlpha',0.3);
 hold on
 patch(exd',-0.01-eyd',[0 0 0],'FaceAlpha',0.3);
 axis equal
@@ -317,7 +322,7 @@ figure()
 patch(ex',ey',[0 0 0],'EdgeColor','none','FaceAlpha',0.3)
 hold on
 patch(exd',eyd',[0 0 0],'FaceAlpha',0.3);
-patch(ex',-0.01-ey',[0 0 0],'EdgeColor','none','FaceAlpha',0.3)
+patch(ex',-0.01-ey',[0 0 0],'EdgeColor','none','FaceAlpha',0.3) % Fråga om plottar
 hold on
 patch(exd',-0.01-eyd',[0 0 0],'FaceAlpha',0.3);
 axis equal
@@ -360,7 +365,6 @@ figure()
 patch(ex', ey', ed5', 'Edgecolor', 'none');
 patch(ex', -0.01-ey', ed5', 'Edgecolor', 'none');
 cbar=colorbar;
-title('Effective von Mises stress field [Pa]')
 xlabel('x-position [m]')
 ylabel('y-position [m]')
 cbar.Title.String = 'Stress [MPa]';
